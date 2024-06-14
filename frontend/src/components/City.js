@@ -1,14 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getCities, addCity, updateCity, deleteCity, getStates } from '../api';
+import { getCities, addCity, updateCity, deleteCity, getStates, getCountries } from '../api'; // Add getCountries import
 
 const City = () => {
   const [cities, setCities] = useState([]);
   const [states, setStates] = useState([]);
+  const [countries, setCountries] = useState([]);
   const [newCityName, setNewCityName] = useState('');
   const [newCityStateId, setNewCityStateId] = useState('');
+  const [newCityCountryId, setNewCityCountryId] = useState('');
   const [editCityId, setEditCityId] = useState(null);
   const [editCityName, setEditCityName] = useState('');
   const [editCityStateId, setEditCityStateId] = useState('');
+  const [editCityCountryId, setEditCityCountryId] = useState('');
+  const [filteredCountryId, setFilteredCountryId] = useState('');
   const [filteredStateId, setFilteredStateId] = useState('');
   const containerRef = useRef(null); // Ref for the container
 
@@ -31,8 +35,18 @@ const City = () => {
       }
     };
 
+    const fetchCountries = async () => {
+      try {
+        const data = await getCountries(); // Fetch countries
+        setCountries(data);
+      } catch (error) {
+        console.error('Error fetching countries:', error);
+      }
+    };
+
     fetchCities();
     fetchStates();
+    fetchCountries(); // Fetch countries on mount
   }, []);
 
   const handleAddCity = async (e) => {
@@ -42,6 +56,7 @@ const City = () => {
       setCities([...cities, newCity]);
       setNewCityName('');
       setNewCityStateId('');
+      setNewCityCountryId('');
       scrollToTop(); // Scroll to top after adding city
     } catch (error) {
       console.error('Error adding city:', error);
@@ -55,6 +70,7 @@ const City = () => {
       setEditCityId(null);
       setEditCityName('');
       setEditCityStateId('');
+      setEditCityCountryId('');
       scrollToTop(); // Scroll to top after updating city
     } catch (error) {
       console.error('Error updating city:', error);
@@ -75,14 +91,21 @@ const City = () => {
     return state ? state.name : '';
   };
 
+  const handleFilterByCountry = (countryId) => {
+    setFilteredCountryId(countryId);
+    setFilteredStateId(''); // Clear state filter when country changes
+  };
+
   const handleFilterByState = (stateId) => {
     setFilteredStateId(stateId);
   };
 
   const clearFilter = () => {
+    setFilteredCountryId('');
     setFilteredStateId('');
   };
 
+  const filteredStates = filteredCountryId ? states.filter(state => state.countryId === filteredCountryId) : states;
   const filteredCities = filteredStateId ? cities.filter(city => city.stateId === filteredStateId) : cities;
 
   const scrollToTop = () => {
@@ -230,13 +253,19 @@ const City = () => {
       <h2>Cities</h2>
 
       <div className="filter-container">
+        <select value={filteredCountryId} onChange={(e) => handleFilterByCountry(e.target.value)}>
+          <option value="">All Countries</option>
+          {countries.map(country => (
+            <option key={country._id} value={country._id}>{country.name}</option>
+          ))}
+        </select>
         <select value={filteredStateId} onChange={(e) => handleFilterByState(e.target.value)}>
           <option value="">All States</option>
-          {states.map(state => (
+          {filteredStates.map(state => (
             <option key={state._id} value={state._id}>{state.name}</option>
           ))}
         </select>
-        {filteredStateId && (
+        {(filteredCountryId || filteredStateId) && (
           <button onClick={clearFilter}>Clear Filter</button>
         )}
       </div>
@@ -250,9 +279,15 @@ const City = () => {
             placeholder="Add new city"
             required
           />
+          <select value={newCityCountryId} onChange={(e) => setNewCityCountryId(e.target.value)} required>
+            <option value="">Select Country</option>
+            {countries.map(country => (
+              <option key={country._id} value={country._id}>{country.name}</option>
+            ))}
+          </select>
           <select value={newCityStateId} onChange={(e) => setNewCityStateId(e.target.value)} required>
             <option value="">Select State</option>
-            {states.map(state => (
+            {states.filter(state => state.countryId === newCityCountryId).map(state => (
               <option key={state._id} value={state._id}>{state.name}</option>
             ))}
           </select>
@@ -271,11 +306,23 @@ const City = () => {
                   onChange={(e) => setEditCityName(e.target.value)}
                 />
                 <select
+                  value={editCityCountryId}
+                  onChange={(e) => {
+                    setEditCityCountryId(e.target.value);
+                    setEditCityStateId(''); // Clear state selection when country changes
+                  }}
+                >
+                  <option value="">Select Country</option>
+                  {countries.map(country => (
+                    <option key={country._id} value={country._id}>{country.name}</option>
+                  ))}
+                </select>
+                <select
                   value={editCityStateId}
                   onChange={(e) => setEditCityStateId(e.target.value)}
                 >
                   <option value="">Select State</option>
-                  {states.map(state => (
+                  {states.filter(state => state.countryId === editCityCountryId).map(state => (
                     <option key={state._id} value={state._id}>{state.name}</option>
                   ))}
                 </select>
@@ -289,6 +336,7 @@ const City = () => {
                   <button className="edit-button" onClick={() => {
                     setEditCityId(city._id);
                     setEditCityName(city.name);
+                    setEditCityCountryId(city.countryId);
                     setEditCityStateId(city.stateId);
                   }}>Edit</button>
                   <button className="delete-button" onClick={() => handleDeleteCity(city._id)}>Delete</button>
