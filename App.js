@@ -1,41 +1,28 @@
+const express = require('express');
+const { MongoClient } = require('mongodb');
+const cors = require('cors');
+const app = express();
+app.use(cors());
+app.use(express.json());
 
-import React, { useState } from 'react';
-import { BrowserRouter as Router, Route, Routes, Link, Navigate } from 'react-router-dom';
-import Country from './components/Country';
-import State from './components/State';
-import City from './components/City';
-import UserPage from './components/UserPage';
-import AdminPage from './components/AdminPage';
-import LoginPage from './components/LoginPage';
+const url = 'mongodb://localhost:27017';
+const dbName = 'countryStateCity';
+let db;
 
-const App = () => {
-  const [authenticatedUser, setAuthenticatedUser] = useState(null);
+MongoClient.connect(url, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(client => {
+    console.log('Connected to MongoDB');
+    db = client.db(dbName);
 
-  const logout = () => {
-    setAuthenticatedUser(null);
-  };
+    const countryRoutes = require('./routes/countries')(db);
+    const stateRoutes = require('./routes/states')(db);
+    const cityRoutes = require('./routes/cities')(db);
 
-  return (
-    <Router>
-      <div className="App">
-        <h1>Country State City Management</h1>
-        <br></br>
-        <Routes>
-          <Route path="/login" element={<LoginPage setAuthenticatedUser={setAuthenticatedUser} />} />
-          <Route path="/admin" element={
-            authenticatedUser?.role === 'admin' ? <AdminPage /> : <Navigate to="/login" />
-          } />
-          <Route path="/user" element={
-            authenticatedUser?.role === 'user' ? <UserPage /> : <Navigate to="/login" />
-          } />
-          <Route path="/countries" element={<Country />} />
-          <Route path="/states" element={<State />} />
-          <Route path="/cities" element={<City />} />
-          <Route path="/" element={<Navigate to="/login" />} />
-        </Routes>
-      </div>
-    </Router>
-  );
-};
+    app.use('/api/countries', countryRoutes);
+    app.use('/api/states', stateRoutes);
+    app.use('/api/cities', cityRoutes);
 
-export default App;
+    const port = process.env.PORT || 5000;
+    app.listen(port, () => console.log(`Server running on port ${port}`));
+  })
+  .catch(err => console.error('Could not connect to MongoDB', err));
